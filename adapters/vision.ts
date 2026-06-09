@@ -1,25 +1,27 @@
 /**
  * Adaptador de visión: extrae datos de facturas a partir de imágenes.
  *
- * Implementación real usando AI SDK v6 + OpenRouter.
- * API de imagen: { type: 'file', mediaType: 'image/...', data: Uint8Array | string }
- * Salida estructurada: generateObject con schema Zod (más fiable que generateText+Output.object
- * para visión en OpenRouter/Gemini, que frecuentemente devuelve texto en lugar de JSON).
+ * Implementación directa via fetch → API REST de OpenRouter (no AI SDK).
+ *
+ * Por qué no AI SDK v6 + @openrouter/ai-sdk-provider:
+ *   El SDK construye internamente `new Headers(responseHeaders)` usando undici
+ *   de Node.js. OpenRouter devuelve algún header con BOM (U+FEFF, char 65279)
+ *   que undici rechaza con TypeError: "Cannot convert argument to a ByteString".
+ *   Usar fetch nativo con `response.json()` evita ese path por completo.
+ *
+ * Salida estructurada: mode=json con schema en system prompt.
  */
 
-import { createOpenRouter } from '@openrouter/ai-sdk-provider'
-import { generateObject } from 'ai'
 import { InvoiceSchema } from '@/core/invoice'
 import type { Invoice } from '@/core/invoice'
 
 export type ImageInput = {
   /**
-   * Bytes de la imagen, string base64, o URL pública como string.
-   * Pasar URL evita transferir bytes a través del SDK y elude el bug
-   * de BOM en headers de respuesta del proveedor OpenRouter/Gemini.
+   * URL pública de la imagen (string que empieza por http/https),
+   * bytes Uint8Array, o string base64.
    */
   data: Uint8Array | string
-  /** MIME type, p. ej. 'image/jpeg', 'image/png', 'image/webp' */
+  /** MIME type, p. ej. 'image/png' */
   mediaType: string
 }
 
@@ -28,10 +30,11 @@ export type VisionExtractor = (image: ImageInput) => Promise<Invoice>
 /**
  * Modelo de visión configurable por entorno.
  * Default: google/gemini-2.5-pro — extracción estructurada fiable en facturas con visión.
- * gemini-2.5-flash devuelve null en la mayoría de campos numéricos/estructurados con OpenRouter.
  */
 const VISION_MODEL =
   process.env['VISION_MODEL'] ?? 'google/gemini-2.5-pro'
+
+const OPENROUTER_API = 'https://openrouter.ai/api/v1/chat/completions'
 
 const EXTRACTION_PROMPT = `
 Eres un extractor especializado de datos de facturas y documentos fiscales.
@@ -78,36 +81,125 @@ REGLAS CRÍTICAS:
 3. Si un campo genuinamente no aparece → null. NUNCA inventes ni calcules valores.
 4. Los importes usan coma decimal en español (200,00) y punto en inglés (200.00) — devuelve siempre número JS.
 5. El NIF del EMISOR y el NIF del DESTINATARIO son distintos — extrae siempre el del emisor.
+
+Responde ÚNICAMENTE con JSON válido siguiendo exactamente el schema indicado, sin texto adicional.
 `.trim()
 
+/** Schema JSON para el modo json_schema de OpenRouter */
+const JSON_SCHEMA = {
+  name: 'invoice',
+  strict: true,
+  schema: {
+    type: 'object',
+    properties: {
+      proveedor: { type: ['string', 'null'] },
+      nif: { type: ['string', 'null'] },
+      numero: { type: ['string', 'null'] },
+      fecha: { type: ['string', 'null'] },
+      categoria: { type: ['string', 'null'] },
+      base: { type: ['number', 'null'] },
+      ivaTipo: { type: ['number', 'null'] },
+      ivaCuota: { type: ['number', 'null'] },
+      total: { type: ['number', 'null'] },
+      moneda: { type: 'string' },
+    },
+    required: ['proveedor', 'nif', 'numero', 'fecha', 'categoria', 'base', 'ivaTipo', 'ivaCuota', 'total', 'moneda'],
+    additionalProperties: false,
+  },
+}
+
 /**
- * Extrae datos de una factura usando visión por IA (OpenRouter).
+ * Construye el content-part de imagen para la API de OpenRouter.
+ * Soporta URL pública, Uint8Array y string base64.
+ */
+function buildImagePart(image: ImageInput): Record<string, unknown> {
+  const { data, mediaType } = image
+
+  // URL pública: usar image_url directamente
+  if (typeof data === 'string' && (data.startsWith('http://') || data.startsWith('https://'))) {
+    return {
+      type: 'image_url',
+      image_url: { url: data },
+    }
+  }
+
+  // Bytes o base64: convertir a data URI
+  let base64: string
+  if (data instanceof Uint8Array) {
+    // Convertir a base64 sin Buffer (disponible en Node.js pero también en Edge)
+    let binary = ''
+    for (let i = 0; i < data.length; i++) {
+      binary += String.fromCharCode(data[i] as number)
+    }
+    base64 = btoa(binary)
+  } else {
+    base64 = data
+  }
+
+  return {
+    type: 'image_url',
+    image_url: { url: `data:${mediaType};base64,${base64}` },
+  }
+}
+
+/**
+ * Extrae datos de una factura usando visión por IA (OpenRouter REST API directa).
  *
- * Usa generateObject (no generateText+Output.object) para garantizar
- * salida estructurada robusta con modelos de visión en OpenRouter.
+ * Usa fetch nativo para evitar el bug de BOM en headers de respuesta
+ * que afecta al AI SDK v6 + undici de Node.js con OpenRouter/Gemini.
  */
 export const extract: VisionExtractor = async (image) => {
-  const openrouter = createOpenRouter({
-    apiKey: process.env['OPENROUTER_API_KEY'],
-  })
+  const apiKey = process.env['OPENROUTER_API_KEY']
+  if (!apiKey) {
+    throw new Error('OPENROUTER_API_KEY no configurada')
+  }
 
-  const { object } = await generateObject({
-    model: openrouter.chat(VISION_MODEL),
-    schema: InvoiceSchema,
+  const imagePart = buildImagePart(image)
+
+  const body = {
+    model: VISION_MODEL,
+    response_format: { type: 'json_schema', json_schema: JSON_SCHEMA },
     messages: [
       {
         role: 'user',
         content: [
           { type: 'text', text: EXTRACTION_PROMPT },
-          {
-            type: 'file',
-            mediaType: image.mediaType as `image/${string}`,
-            data: image.data,
-          },
+          imagePart,
         ],
       },
     ],
+  }
+
+  const response = await fetch(OPENROUTER_API, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(body),
   })
 
-  return object as Invoice
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '(sin cuerpo)')
+    throw new Error(`OpenRouter error ${response.status}: ${errText}`)
+  }
+
+  const json = await response.json() as {
+    choices: Array<{ message: { content: string } }>
+    error?: { message: string }
+  }
+
+  if (json.error) {
+    throw new Error(`OpenRouter API error: ${json.error.message}`)
+  }
+
+  const content = json.choices?.[0]?.message?.content
+  if (!content) {
+    throw new Error('Respuesta vacía del modelo')
+  }
+
+  // Parsear y validar con Zod
+  const parsed = JSON.parse(content) as unknown
+  const result = InvoiceSchema.parse(parsed)
+  return result
 }
