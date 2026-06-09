@@ -117,19 +117,15 @@ export async function POST(request: Request) {
     }
 
     try {
-      // Cargar imagen vía fetch de la URL pública (CDN).
-      // En Vercel serverless, public/ se sirve por CDN y no está en el filesystem
-      // de la función → readFile daría ENOENT. fetch de la URL propia siempre funciona.
-      const imageUrl = new URL(`/samples/${sampleId}.png`, request.url)
-      const imageResponse = await fetch(imageUrl)
-      if (!imageResponse.ok) {
-        throw new Error(`No se pudo cargar la imagen: ${imageResponse.status} ${imageUrl}`)
-      }
-      const imageData = new Uint8Array(await imageResponse.arrayBuffer())
+      // Construimos la URL pública de la imagen y la pasamos directamente al SDK.
+      // - Evita readFile (ENOENT en Vercel serverless: public/ está en CDN, no en disco).
+      // - Evita transferir bytes a través del SDK y el bug de BOM en headers de respuesta
+      //   del proveedor OpenRouter/Gemini (TypeError: Cannot convert argument to ByteString).
+      const imageUrl = new URL(`/samples/${sampleId}.png`, request.url).toString()
 
       // Llamar a extract con timeout configurable (leído en runtime para test-ability)
       const invoice = await withTimeout(
-        extract({ data: imageData, mediaType: 'image/png' }),
+        extract({ data: imageUrl, mediaType: 'image/png' }),
         getLiveTimeoutMs(),
       )
 

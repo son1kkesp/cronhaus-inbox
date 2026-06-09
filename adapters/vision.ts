@@ -13,7 +13,11 @@ import { InvoiceSchema } from '@/core/invoice'
 import type { Invoice } from '@/core/invoice'
 
 export type ImageInput = {
-  /** Bytes de la imagen o string base64 */
+  /**
+   * Bytes de la imagen, string base64, o URL pública como string.
+   * Pasar URL evita transferir bytes a través del SDK y elude el bug
+   * de BOM en headers de respuesta del proveedor OpenRouter/Gemini.
+   */
   data: Uint8Array | string
   /** MIME type, p. ej. 'image/jpeg', 'image/png', 'image/webp' */
   mediaType: string

@@ -52,22 +52,9 @@ vi.mock('@/app/lib/rateLimiter', () => ({
   },
 }))
 
-// ─── Mock de fetch global (para carga de imagen en modo live) ─────────────────
-
-/**
- * Crea un Response falso con bytes PNG mínimos para que el route no falle
- * al intentar fetch('/samples/<id>.png') en jsdom (sin servidor real).
- */
-function makeFakePngResponse(): Response {
-  // PNG mínimo válido (1x1 px transparente)
-  const fakeBytes = new Uint8Array([
-    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-  ])
-  return new Response(fakeBytes.buffer, {
-    status: 200,
-    headers: { 'Content-Type': 'image/png' },
-  })
-}
+// ─── Nota sobre fetch en modo live ───────────────────────────────────────────
+// El route ya NO hace fetch de la imagen: pasa la URL pública directamente al SDK.
+// Por tanto no se necesita mock de fetch global para carga de imagen.
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -87,12 +74,9 @@ beforeEach(() => {
   rateLimitAllowed = true
   // Cambia el sessionId para que el rate limiter quede limpio
   mockSessionId = `session-${Math.random().toString(36).slice(2)}`
-  // Mock global fetch para que la carga de imagen PNG no falle en jsdom
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeFakePngResponse()))
 })
 
 afterEach(() => {
-  vi.unstubAllGlobals()
   vi.unstubAllEnvs()
 })
 
