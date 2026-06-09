@@ -8,7 +8,7 @@
  * La función `extract` se mockea con vi.mock — NUNCA IA real en tests.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { POST } from '@/app/api/analyze/route'
 
 // ─── Mock de next/headers ─────────────────────────────────────────────────────
@@ -52,6 +52,23 @@ vi.mock('@/app/lib/rateLimiter', () => ({
   },
 }))
 
+// ─── Mock de fetch global (para carga de imagen en modo live) ─────────────────
+
+/**
+ * Crea un Response falso con bytes PNG mínimos para que el route no falle
+ * al intentar fetch('/samples/<id>.png') en jsdom (sin servidor real).
+ */
+function makeFakePngResponse(): Response {
+  // PNG mínimo válido (1x1 px transparente)
+  const fakeBytes = new Uint8Array([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+  ])
+  return new Response(fakeBytes.buffer, {
+    status: 200,
+    headers: { 'Content-Type': 'image/png' },
+  })
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function makeRequest(body: Record<string, unknown>): Request {
@@ -70,6 +87,13 @@ beforeEach(() => {
   rateLimitAllowed = true
   // Cambia el sessionId para que el rate limiter quede limpio
   mockSessionId = `session-${Math.random().toString(36).slice(2)}`
+  // Mock global fetch para que la carga de imagen PNG no falle en jsdom
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeFakePngResponse()))
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
 })
 
 describe('POST /api/analyze — modo cacheado (sin live)', () => {
@@ -119,7 +143,10 @@ describe('POST /api/analyze — modo cacheado (sin live)', () => {
 })
 
 describe('POST /api/analyze — modo live', () => {
-  it('(b) si extract cuelga >8s → responde expected con fallback:true', async () => {
+  it('(b) si extract cuelga > LIVE_TIMEOUT_MS → responde expected con fallback:true', async () => {
+    // Reducimos el timeout interno a 500 ms para que el test sea rápido
+    vi.stubEnv('LIVE_TIMEOUT_MS', '500')
+
     // Mock que nunca resuelve (simula timeout)
     mockExtract.mockImplementation(
       () => new Promise((_resolve) => { /* never resolves */ }),
@@ -133,7 +160,7 @@ describe('POST /api/analyze — modo live', () => {
     expect(body.fallback).toBe(true)
     expect(body.invoice).toBeDefined()
     expect(body.proposal).toBeDefined()
-  }, 15_000) // Timeout del test: 15s para dar margen al timeout interno de 8s
+  }, 3_000) // Timeout del test: 3s (margen sobre los 500ms internos)
 
   it('(c) 4ª petición live en <10 min → HTTP 429', async () => {
     // Después de 3 llamadas permitidas, la 4ª está bloqueada

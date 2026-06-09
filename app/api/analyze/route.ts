@@ -11,15 +11,13 @@
  * Modo live (live: true):
  *   - Rate-limit: 3 req / 10 min por sesión (best-effort en memoria).
  *     NOTA: no garantizado entre múltiples instancias de proceso (es una demo).
- *   - Carga la imagen de la muestra desde disco.
- *   - Llama a extract() con timeout de 8 s.
+ *   - Carga la imagen de la muestra vía fetch de la URL pública (CDN).
+ *     (readFile no funciona en Vercel serverless ya que public/ está en CDN, no en disco.)
+ *   - Llama a extract() con timeout configurable (LIVE_TIMEOUT_MS, default 30 s).
  *   - Ante error 5xx / timeout / fallo de validación → fallback al expected.json
  *     con flag fallback: true.
  *   - Si extract tiene éxito: corre reason() + propose() con seedLedger().
  */
-
-import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
 
 import { isSampleId, SAMPLES } from '@/app/lib/samples'
 import { getSessionId } from '@/app/lib/session'
@@ -30,7 +28,20 @@ import { reason, propose } from '@/core/reasoning'
 import { seedLedger } from '@/core/ledger'
 import type { Invoice } from '@/core/invoice'
 
-const LIVE_TIMEOUT_MS = 8_000
+/**
+ * Tiempo máximo de espera para la llamada a la IA en modo live.
+ * Se lee en cada petición para que los tests puedan controlarlo con vi.stubEnv.
+ * Default en producción: 30 000 ms.
+ */
+function getLiveTimeoutMs(): number {
+  return Number(process.env['LIVE_TIMEOUT_MS'] ?? 30_000)
+}
+
+/**
+ * Duración máxima de la función serverless en Vercel (en segundos).
+ * Necesario para que la función no sea cortada antes del timeout de la IA (~10-20 s).
+ */
+export const maxDuration = 60
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -106,14 +117,20 @@ export async function POST(request: Request) {
     }
 
     try {
-      // Cargar imagen de disco
-      const imagePath = join(process.cwd(), 'public', 'samples', `${sampleId}.png`)
-      const imageData = await readFile(imagePath)
+      // Cargar imagen vía fetch de la URL pública (CDN).
+      // En Vercel serverless, public/ se sirve por CDN y no está en el filesystem
+      // de la función → readFile daría ENOENT. fetch de la URL propia siempre funciona.
+      const imageUrl = new URL(`/samples/${sampleId}.png`, request.url)
+      const imageResponse = await fetch(imageUrl)
+      if (!imageResponse.ok) {
+        throw new Error(`No se pudo cargar la imagen: ${imageResponse.status} ${imageUrl}`)
+      }
+      const imageData = new Uint8Array(await imageResponse.arrayBuffer())
 
-      // Llamar a extract con timeout de 8 s
+      // Llamar a extract con timeout configurable (leído en runtime para test-ability)
       const invoice = await withTimeout(
         extract({ data: imageData, mediaType: 'image/png' }),
-        LIVE_TIMEOUT_MS,
+        getLiveTimeoutMs(),
       )
 
       // Razonar con seedLedger() (no el store de sesión, para coherencia con live)
