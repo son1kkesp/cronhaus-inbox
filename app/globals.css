@@ -128,3 +128,12 @@
     @apply font-sans;
   }
 }
+
+@keyframes highlight {
+  0% {
+    background-color: oklch(0.87 0.12 142 / 30%);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
