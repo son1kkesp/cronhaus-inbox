@@ -143,8 +143,9 @@ export async function POST(request: Request) {
       }
 
       return Response.json({ invoice, findings, proposal })
-    } catch {
+    } catch (err) {
       // Fallback al expected.json ante cualquier error (timeout, red, validación…)
+      console.error('[analyze/live] Error en extracción:', err instanceof Error ? err.message : String(err))
       const { invoice, findings, proposal } = sample
       return Response.json({ invoice, findings, proposal, fallback: true })
     }
