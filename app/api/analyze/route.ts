@@ -141,13 +141,9 @@ export async function POST(request: Request) {
       return Response.json({ invoice, findings, proposal })
     } catch (err) {
       // Fallback al expected.json ante cualquier error (timeout, red, validación…)
-      const errMsg = err instanceof Error
-        ? `${err.message}\n${err.stack ?? ''}`
-        : String(err)
-      console.error('[analyze/live] Error completo:', errMsg)
+      console.error('[analyze/live] Error:', err instanceof Error ? err.message : String(err))
       const { invoice, findings, proposal } = sample
-      // DEBUG TEMPORAL: incluir _debug en respuesta para diagnóstico
-      return Response.json({ invoice, findings, proposal, fallback: true, _debug: errMsg })
+      return Response.json({ invoice, findings, proposal, fallback: true })
     }
   }
 
