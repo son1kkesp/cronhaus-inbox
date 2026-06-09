@@ -1,17 +1,19 @@
 /**
  * Adaptador de visión: extrae datos de facturas a partir de imágenes.
  *
- * Implementación directa via fetch → API REST de OpenRouter (no AI SDK).
+ * Implementación directa via node:https → API REST de OpenRouter.
  *
- * Por qué no AI SDK v6 + @openrouter/ai-sdk-provider:
- *   El SDK construye internamente `new Headers(responseHeaders)` usando undici
- *   de Node.js. OpenRouter devuelve algún header con BOM (U+FEFF, char 65279)
- *   que undici rechaza con TypeError: "Cannot convert argument to a ByteString".
- *   Usar fetch nativo con `response.json()` evita ese path por completo.
+ * Por qué no fetch() / AI SDK v6:
+ *   Next.js 16 + Turbopack en Vercel serverless intercepta el fetch global
+ *   y construye `new Headers(responseHeaders)` usando undici internamente.
+ *   OpenRouter devuelve al menos un header con BOM (U+FEFF, charCode 65279)
+ *   que undici rechaza: TypeError "Cannot convert argument to a ByteString".
+ *   Usar node:https directamente evita ese path por completo.
  *
- * Salida estructurada: mode=json con schema en system prompt.
+ * Salida estructurada: response_format json_schema.
  */
 
+import * as https from 'node:https'
 import { InvoiceSchema } from '@/core/invoice'
 import type { Invoice } from '@/core/invoice'
 
@@ -143,10 +145,46 @@ function buildImagePart(image: ImageInput): Record<string, unknown> {
 }
 
 /**
- * Extrae datos de una factura usando visión por IA (OpenRouter REST API directa).
+ * Realiza una petición HTTPS sin pasar por el fetch polyfill de Next.js/undici.
+ * Devuelve el body como string para que lo parsee el llamador.
+ */
+function httpsPost(url: string, headers: Record<string, string>, bodyStr: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url)
+    const req = https.request(
+      {
+        hostname: parsed.hostname,
+        path: parsed.pathname + parsed.search,
+        method: 'POST',
+        headers: {
+          ...headers,
+          'Content-Length': Buffer.byteLength(bodyStr),
+        },
+      },
+      (res) => {
+        const chunks: Buffer[] = []
+        res.on('data', (chunk: Buffer) => chunks.push(chunk))
+        res.on('end', () => {
+          const body = Buffer.concat(chunks).toString('utf8')
+          if ((res.statusCode ?? 0) >= 400) {
+            reject(new Error(`OpenRouter HTTP ${res.statusCode}: ${body}`))
+          } else {
+            resolve(body)
+          }
+        })
+      },
+    )
+    req.on('error', reject)
+    req.write(bodyStr)
+    req.end()
+  })
+}
+
+/**
+ * Extrae datos de una factura usando visión por IA (OpenRouter REST API via node:https).
  *
- * Usa fetch nativo para evitar el bug de BOM en headers de respuesta
- * que afecta al AI SDK v6 + undici de Node.js con OpenRouter/Gemini.
+ * Usa node:https directamente para evitar el bug de BOM en headers de respuesta
+ * que afecta a fetch() en Next.js 16 + Turbopack + undici con OpenRouter/Gemini.
  */
 export const extract: VisionExtractor = async (image) => {
   const apiKey = process.env['OPENROUTER_API_KEY']
@@ -156,7 +194,7 @@ export const extract: VisionExtractor = async (image) => {
 
   const imagePart = buildImagePart(image)
 
-  const body = {
+  const bodyObj = {
     model: VISION_MODEL,
     response_format: { type: 'json_schema', json_schema: JSON_SCHEMA },
     messages: [
@@ -169,22 +207,18 @@ export const extract: VisionExtractor = async (image) => {
       },
     ],
   }
+  const bodyStr = JSON.stringify(bodyObj)
 
-  const response = await fetch(OPENROUTER_API, {
-    method: 'POST',
-    headers: {
+  const rawBody = await httpsPost(
+    OPENROUTER_API,
+    {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`,
     },
-    body: JSON.stringify(body),
-  })
+    bodyStr,
+  )
 
-  if (!response.ok) {
-    const errText = await response.text().catch(() => '(sin cuerpo)')
-    throw new Error(`OpenRouter error ${response.status}: ${errText}`)
-  }
-
-  const json = await response.json() as {
+  const json = JSON.parse(rawBody) as {
     choices: Array<{ message: { content: string } }>
     error?: { message: string }
   }
