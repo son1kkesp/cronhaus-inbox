@@ -9,7 +9,8 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "mcp": "tsx adapters/mcp-server.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
