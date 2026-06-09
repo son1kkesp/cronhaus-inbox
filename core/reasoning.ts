@@ -7,7 +7,7 @@ const TIPOS_IVA_LEGALES = new Set([0, 4, 10, 21])
 
 // ─── Regla A: campos obligatorios ────────────────────────────────────────────
 
-function regleA(invoice: Invoice): Finding[] {
+function reglaA(invoice: Invoice): Finding[] {
   const required: Array<keyof Invoice> = ['proveedor', 'nif', 'fecha', 'total']
   const missing = required.filter((campo) => invoice[campo] === null || invoice[campo] === undefined)
   if (missing.length === 0) return []
@@ -114,7 +114,7 @@ function reglaE(invoice: Invoice, ledger: LedgerEntry[]): Finding[] {
 
 export function reason(invoice: Invoice, ledger: LedgerEntry[]): Finding[] {
   return [
-    ...regleA(invoice),
+    ...reglaA(invoice),
     ...reglaB(invoice),
     ...reglaC(invoice),
     ...reglaD(invoice, ledger),
