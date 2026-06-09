@@ -35,7 +35,7 @@ Revisar y registrar facturas a mano es lento y propenso a errores: datos que fal
 
 ## Demo en vivo
 
-<!-- DEMO_URL -->
+**▶︎ Pruébala en vivo: [cronhaus-inbox.vercel.app](https://cronhaus-inbox.vercel.app)**
 
 La demo pública incluye cuatro muestras pre-calculadas (factura correcta, sin NIF, duplicada, internacional en inglés). Las muestras se sirven desde respuestas cacheadas para preservar la privacidad de quienes visitan y eliminar latencia — sin llamadas IA al seleccionarlas.
 
