@@ -57,7 +57,7 @@ cronhaus-inbox/
 │   └── ledger.ts       # Tipo LedgerEntry
 │
 ├── adapters/           # Puertos hacia el mundo exterior
-│   ├── vision.ts       # Extracción con AI SDK + gemini-2.5-pro (generateObject)
+│   ├── vision.ts       # Extracción vía node:https → OpenRouter REST (response_format: json_schema, gemini-2.5-pro)
 │   ├── vision.mock.ts  # Adaptador de pruebas con datos esperados
 │   ├── store.ts        # InvoiceStore en memoria con seed inicial
 │   ├── mcp-server.ts   # Servidor MCP stdio — expone reason_invoice
@@ -86,8 +86,7 @@ cronhaus-inbox/
 |------|-----------|---------|
 | Framework | Next.js (App Router) | 16.2.7 |
 | Runtime | React | 19.2.4 |
-| IA / Visión | AI SDK (`ai`) | 6.0.198 |
-| Proveedor IA | `@openrouter/ai-sdk-provider` | 2.9.0 |
+| IA / Visión | `node:https` → OpenRouter REST API (`response_format: json_schema`) | — |
 | Modelo | gemini-2.5-pro (vía OpenRouter) | — |
 | Validación | Zod | 4.4.3 |
 | Tests unitarios | Vitest | 4.1.8 |
@@ -95,6 +94,8 @@ cronhaus-inbox/
 | Servidor MCP | `@modelcontextprotocol/sdk` | 1.29.0 |
 | Estilos | Tailwind CSS v4 | 4.x |
 | Gestor de paquetes | pnpm | — |
+
+> **Nota técnica — por qué `node:https` y no el AI SDK:** la capa de visión usa `node:https` directamente contra la API REST de OpenRouter en lugar del AI SDK v6. Next.js 16 + Turbopack en Vercel intercepta `fetch()` con undici, que rechaza una cabecera con BOM (U+FEFF) que devuelve OpenRouter — `TypeError: Cannot convert argument to a ByteString`. Llamar a `node:https` directamente evita ese path por completo. El AI SDK (`ai` y `@openrouter/ai-sdk-provider`) se eliminó del `package.json` al confirmar que no se importa en ningún módulo.
 
 ---
 

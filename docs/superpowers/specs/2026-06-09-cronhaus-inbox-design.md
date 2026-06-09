@@ -170,3 +170,13 @@ Problema en 2 líneas · **GIF de 10 s** de la demo · enlace a demo en vivo · 
 
 - **Cerrado:** muestras cacheadas por defecto · sandbox sembrado · solo imágenes una página · IVA de tipo único en v1 · repo público desde el día 1 · MCP stdio sobre `reason_invoice`.
 - **Abierto:** nombre definitivo ("Cronhaus Inbox" provisional) · modelo de visión concreto para el camino "en vivo" (Claude vía AI Gateway por defecto; confirmar coste/calidad).
+
+---
+
+## Nota de implementación (post-v1)
+
+La capa de visión (`adapters/vision.ts`) **no usa el AI SDK v6** tal como planificaba este spec. Usa `node:https` directamente contra la API REST de OpenRouter con `response_format: json_schema` y el modelo `google/gemini-2.5-pro`.
+
+**Motivo:** Next.js 16 + Turbopack en Vercel intercepta `fetch()` vía undici. OpenRouter devuelve al menos un header con BOM (U+FEFF, charCode 65279) que undici rechaza con `TypeError: Cannot convert argument to a ByteString`. Usar `node:https` directamente evita ese path. Las dependencias `ai` y `@openrouter/ai-sdk-provider` se eliminaron del `package.json` al no usarse.
+
+La arquitectura hexagonal y el contrato del adaptador (`VisionExtractor`) no cambian — solo la implementación interna del adaptador.

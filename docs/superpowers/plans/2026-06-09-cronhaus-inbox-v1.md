@@ -202,3 +202,9 @@ cronhaus-inbox/
 
 ## Done = v1
 `core` (5 reglas + duplicado integrado) testeado · demo cacheada con sandbox sembrado · export CSV · MCP stdio (`reason_invoice`) · README con GIF · CI verde · demo en vivo en Vercel. v2 fuera (spec §17).
+
+---
+
+## Nota de implementación (post-v1)
+
+**Phase 2 (adaptador de visión):** la Task 2.2 se implementó con `node:https` directo contra la API REST de OpenRouter en lugar del AI SDK v6 (`generateObject`). El cambio fue necesario para sortear un bug de BOM en headers de respuesta de OpenRouter que undici/Next 16 rechaza. Las dependencias `ai` y `@openrouter/ai-sdk-provider` no se usan y se eliminaron del `package.json`. El contrato del adaptador (`VisionExtractor`) no cambió.
