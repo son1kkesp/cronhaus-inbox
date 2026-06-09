@@ -1,27 +1,19 @@
 {
   "_meta": {
-    "generatedAt": "2026-06-09T13:27:11.207Z",
-    "adjustments": [
-      "nif ajustado de \"null\" a \"B-87654321\" (campo presente en el HTML)",
-      "numero ajustado de \"null\" a \"FAC-101\"",
-      "fecha ajustada de \"null\" a \"2024-05-15\"",
-      "base ajustada de null a 200",
-      "ivaTipo ajustado de null a 21",
-      "ivaCuota ajustada de null a 42",
-      "total ajustado de 242.00000000000003 a 242"
-    ]
+    "generatedAt": "2026-06-09T13:37:48.438Z"
   },
   "invoice": {
     "proveedor": "Suministros Ibéricos SL",
     "nif": "B-87654321",
     "numero": "FAC-101",
     "fecha": "2024-05-15",
-    "categoria": null,
+    "categoria": "suministros",
     "base": 200,
     "ivaTipo": 21,
     "ivaCuota": 42,
     "total": 242,
-    "moneda": "EUR"
+    "moneda": "EUR",
+    "confidence": {}
   },
   "findings": [],
   "proposal": {

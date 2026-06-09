@@ -1,25 +1,19 @@
 {
   "_meta": {
-    "generatedAt": "2026-06-09T13:27:13.037Z",
-    "adjustments": [
-      "numero ajustado de \"null\" a \"FAC-205\"",
-      "fecha ajustada de \"null\" a \"2024-06-20\"",
-      "base ajustada de null a 900",
-      "ivaTipo ajustado de null a 21",
-      "ivaCuota ajustada de null a 189"
-    ]
+    "generatedAt": "2026-06-09T13:38:12.823Z"
   },
   "invoice": {
     "proveedor": "Consulting & Servicios Digitales SL",
     "nif": null,
     "numero": "FAC-205",
     "fecha": "2024-06-20",
-    "categoria": null,
+    "categoria": "servicios TI",
     "base": 900,
     "ivaTipo": 21,
     "ivaCuota": 189,
     "total": 1089,
-    "moneda": "EUR"
+    "moneda": "EUR",
+    "confidence": {}
   },
   "findings": [
     {
