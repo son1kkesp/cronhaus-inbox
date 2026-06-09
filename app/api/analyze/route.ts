@@ -150,7 +150,8 @@ export async function POST(request: Request) {
         : String(err)
       console.error('[analyze/live] Error completo:', errMsg)
       const { invoice, findings, proposal } = sample
-      return Response.json({ invoice, findings, proposal, fallback: true })
+      // DEBUG TEMPORAL: incluir _debug en respuesta para diagnóstico
+      return Response.json({ invoice, findings, proposal, fallback: true, _debug: errMsg })
     }
   }
 
