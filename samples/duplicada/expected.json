@@ -1,0 +1,41 @@
+{
+  "_meta": {
+    "generatedAt": "2026-06-09T13:27:14.596Z",
+    "adjustments": [
+      "nif ajustado de \"null\" a \"A-82018474\"",
+      "numero ajustado de \"null\" a \"FAC-012\"",
+      "fecha ajustada de \"null\" a \"2024-03-01\"",
+      "base ajustada de null a 300",
+      "ivaTipo ajustado de null a 21",
+      "ivaCuota ajustada de null a 63"
+    ]
+  },
+  "invoice": {
+    "proveedor": "Telefónica SA",
+    "nif": "A-82018474",
+    "numero": "FAC-012",
+    "fecha": "2024-03-01",
+    "categoria": null,
+    "base": 300,
+    "ivaTipo": 21,
+    "ivaCuota": 63,
+    "total": 363,
+    "moneda": "EUR"
+  },
+  "findings": [
+    {
+      "tipo": "duplicate",
+      "severidad": "alta",
+      "mensajeHumano": "Posible duplicado: factura FAC-012 de Telefónica SA por 363 ya registrada",
+      "camposAfectados": [
+        "proveedor",
+        "numero",
+        "total"
+      ]
+    }
+  ],
+  "proposal": {
+    "accion": "marcar_duplicado",
+    "motivo": "La factura ya existe en el libro contable"
+  }
+}

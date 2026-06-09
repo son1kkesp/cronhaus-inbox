@@ -1,0 +1,40 @@
+{
+  "_meta": {
+    "generatedAt": "2026-06-09T13:27:16.363Z",
+    "adjustments": [
+      "nif ajustado de \"null\" a \"GB-985432100\"",
+      "numero ajustado de \"null\" a \"INV-2024-089\"",
+      "fecha ajustada de \"null\" a \"2024-07-10\"",
+      "base ajustada de null a 500",
+      "ivaTipo ajustado de null a 21",
+      "ivaCuota ajustada de null a 105",
+      "total ajustado de 605.0000000000001 a 605"
+    ]
+  },
+  "invoice": {
+    "proveedor": "CloudStack Solutions Ltd.",
+    "nif": "GB-985432100",
+    "numero": "INV-2024-089",
+    "fecha": "2024-07-10",
+    "categoria": null,
+    "base": 500,
+    "ivaTipo": 21,
+    "ivaCuota": 105,
+    "total": 605,
+    "moneda": "EUR"
+  },
+  "findings": [
+    {
+      "tipo": "new_supplier",
+      "severidad": "baja",
+      "mensajeHumano": "Proveedor nuevo no visto en el libro: CloudStack Solutions Ltd.",
+      "camposAfectados": [
+        "proveedor"
+      ]
+    }
+  ],
+  "proposal": {
+    "accion": "registrar",
+    "motivo": "La factura supera todas las validaciones automáticas"
+  }
+}
